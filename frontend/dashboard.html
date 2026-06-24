@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Control System Dashboard</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+            background: #0b1220;
+            color: white;
+        }
+
+        .topbar {
+            background: #111a2e;
+            padding: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            border-bottom: 2px solid #1f2a44;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .panel {
+            background: #111a2e;
+            padding: 20px;
+            border-radius: 10px;
+            width: 30%;
+        }
+
+        .main {
+            background: #111a2e;
+            padding: 20px;
+            border-radius: 10px;
+            width: 70%;
+            height: 80vh;
+            overflow-y: auto;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            background: #0b1220;
+            border: 1px solid #2c3a5a;
+            color: white;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .add-btn {
+            background: #00c853;
+            color: white;
+        }
+
+        .cancel-btn {
+            background: #555;
+            color: white;
+        }
+
+        .card {
+            background: #0b1220;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 5px solid #00c853;
+            border-radius: 8px;
+        }
+
+        .warning { border-left-color: orange; }
+        .inactive { border-left-color: red; }
+
+        .delete {
+            background: red;
+            color: white;
+            margin-top: 10px;
+        }
+
+        .edit {
+            background: #2962ff;
+            color: white;
+            margin-top: 5px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .box {
+            flex: 1;
+            padding: 15px;
+            background: #0b1220;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .green { color: #00c853; }
+        .orange { color: orange; }
+        .red { color: red; }
+
+        .msg {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .msg.error {
+            background: #3a1212;
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+            display: block;
+        }
+
+        .msg.success {
+            background: #0f3a1f;
+            color: #4ade80;
+            border: 1px solid #4ade80;
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #5a6a8a;
+            padding: 40px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="topbar">
+    🛢 NCDMB CONTROL SYSTEM DASHBOARD
+</div>
+
+<div class="container">
+
+    <!-- LEFT PANEL -->
+    <div class="panel">
+        <h3 id="form-title">Add Equipment</h3>
+
+        <input id="name" placeholder="Name">
+        <input id="type" placeholder="Type">
+        <input id="location" placeholder="Location">
+
+        <select id="status">
+            <option value="active">active</option>
+            <option value="warning">warning</option>
+            <option value="inactive">inactive</option>
+        </select>
+
+        <input id="recommendation" placeholder="Recommendation">
+
+        <button class="add-btn" id="submit-btn" onclick="addEquipment()">
+            ADD
+        </button>
+        <button class="cancel-btn" id="cancel-btn" onclick="cancelEdit()" style="display:none;">
+            CANCEL
+        </button>
+
+        <div class="msg" id="form-msg"></div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="main">
+
+        <div class="stats">
+            <div class="box">Total<br><span id="total">0</span></div>
+            <div class="box green">Active<br><span id="active">0</span></div>
+            <div class="box orange">Warning<br><span id="warning">0</span></div>
+            <div class="box red">Inactive<br><span id="inactive">0</span></div>
+        </div>
+
+        <h3>Equipment Status</h3>
+        <div id="list"></div>
+
+    </div>
+</div>
+
+<script>
+
+const API = "http://13.60.28.201";
+let editId = null;
+let equipmentData = {}; // cache of loaded items, keyed by id, avoids unsafe inline-string onclick args
+
+// SAFE GET INPUT
+function val(id) {
+    return document.getElementById(id).value.trim();
+}
+
+function showMsg(text, type) {
+    const el = document.getElementById("form-msg");
+    el.textContent = text;
+    el.className = "msg " + type;
+    setTimeout(() => { el.className = "msg"; }, 4000);
+}
+
+// LOAD DATA
+async function loadEquipment() {
+    try {
+        const res = await fetch(`${API}/equipment`);
+        if (!res.ok) throw new Error("Failed to load equipment (status " + res.status + ")");
+        const data = await res.json();
+
+        let total = data.length;
+        let active = 0, warning = 0, inactive = 0;
+        let html = "";
+
+        equipmentData = {};
+
+        data.forEach(item => {
+            equipmentData[item.id] = item;
+
+            if (item.status === "active") active++;
+            if (item.status === "warning") warning++;
+            if (item.status === "inactive") inactive++;
+
+            html += `
+                <div class="card ${item.status}">
+                    <b>${escapeHtml(item.name)}</b><br>
+                    Type: ${escapeHtml(item.type)}<br>
+                    Location: ${escapeHtml(item.location)}<br>
+                    Status: ${escapeHtml(item.status)}<br>
+                    Recommendation: ${escapeHtml(item.recommendation)}
+
+                    <button class="edit" onclick="editEquipment(${item.id})">
+                        Edit
+                    </button>
+
+                    <button class="delete" onclick="deleteEquipment(${item.id})">
+                        Delete
+                    </button>
+                </div>
+            `;
+        });
+
+        document.getElementById("list").innerHTML = html || `<div class="empty-state">No equipment recorded yet.</div>`;
+
+        document.getElementById("total").innerText = total;
+        document.getElementById("active").innerText = active;
+        document.getElementById("warning").innerText = warning;
+        document.getElementById("inactive").innerText = inactive;
+
+    } catch (err) {
+        document.getElementById("list").innerHTML =
+            `<div class="empty-state" style="color:#ff6b6b;">Could not load equipment: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+// Prevent stored values from breaking the page if they contain HTML/script-like text
+function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+}
+
+// ADD / UPDATE
+async function addEquipment() {
+    const data = {
+        name: val("name"),
+        type: val("type"),
+        location: val("location"),
+        status: val("status"),
+        recommendation: val("recommendation")
+    };
+
+    // basic validation
+    const missing = Object.entries(data).filter(([k, v]) => !v).map(([k]) => k);
+    if (missing.length) {
+        showMsg(`Please fill in: ${missing.join(", ")}`, "error");
+        return;
+    }
+
+    const isEdit = editId !== null;
+    const url = isEdit ? `${API}/equipment/${editId}` : `${API}/equipment`;
+    const method = isEdit ? "PUT" : "POST";
+
+    const submitBtn = document.getElementById("submit-btn");
+    submitBtn.disabled = true;
+
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(data)
+        });
+
+        const result = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            throw new Error(result.error || `Request failed (status ${res.status})`);
+        }
+
+        showMsg(isEdit ? "Updated successfully" : "Added successfully", "success");
+        cancelEdit(); // clears form + editId
+        loadEquipment();
+
+    } catch (err) {
+        showMsg(err.message, "error");
+    } finally {
+        submitBtn.disabled = false;
+    }
+}
+
+// EDIT
+function editEquipment(id) {
+    const item = equipmentData[id];
+    if (!item) return;
+
+    document.getElementById("name").value = item.name;
+    document.getElementById("type").value = item.type;
+    document.getElementById("location").value = item.location;
+    document.getElementById("status").value = item.status;
+    document.getElementById("recommendation").value = item.recommendation;
+
+    editId = id;
+    document.getElementById("form-title").innerText = "Edit Equipment";
+    document.getElementById("submit-btn").innerText = "UPDATE";
+    document.getElementById("cancel-btn").style.display = "block";
+}
+
+// CANCEL EDIT / RESET FORM
+function cancelEdit() {
+    editId = null;
+    document.getElementById("name").value = "";
+    document.getElementById("type").value = "";
+    document.getElementById("location").value = "";
+    document.getElementById("status").value = "active";
+    document.getElementById("recommendation").value = "";
+
+    document.getElementById("form-title").innerText = "Add Equipment";
+    document.getElementById("submit-btn").innerText = "ADD";
+    document.getElementById("cancel-btn").style.display = "none";
+}
+
+// DELETE
+async function deleteEquipment(id) {
+    const item = equipmentData[id];
+    const label = item ? item.name : `#${id}`;
+
+    if (!confirm(`Delete "${label}"? This cannot be undone.`)) return;
+
+    try {
+        const res = await fetch(`${API}/equipment/${id}`, { method: "DELETE" });
+        const result = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            throw new Error(result.error || `Delete failed (status ${res.status})`);
+        }
+
+        loadEquipment();
+
+    } catch (err) {
+        showMsg(err.message, "error");
+    }
+}
+
+// INIT
+loadEquipment();
+
+</script>
+
+</body>
+</html>

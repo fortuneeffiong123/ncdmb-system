@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NCDMB Control System - Login</title>
+
+<style>
+    body {
+        margin: 0;
+        font-family: Arial;
+        background: #0b1220;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        color: white;
+    }
+
+    .box {
+        width: 350px;
+        background: #111a2e;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        border: 1px solid #1f2a44;
+    }
+
+    h2 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #00c853;
+    }
+
+    input {
+        width: 100%;
+        padding: 12px;
+        margin: 10px 0;
+        border-radius: 6px;
+        border: 1px solid #2c3a5a;
+        background: #0b1220;
+        color: white;
+    }
+
+    button {
+        width: 100%;
+        padding: 12px;
+        margin-top: 10px;
+        background: #00c853;
+        border: none;
+        color: white;
+        font-weight: bold;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #00b34a;
+    }
+
+    .msg {
+        margin-top: 15px;
+        text-align: center;
+        font-size: 14px;
+    }
+
+    .error { color: red; }
+    .success { color: #00c853; }
+
+    .footer {
+        text-align: center;
+        font-size: 12px;
+        margin-top: 15px;
+        color: #aaa;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="box">
+
+    <h2>CONTROL LOGIN</h2>
+
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+
+    <button onclick="login()">LOGIN</button>
+
+    <div class="msg" id="msg"></div>
+
+    <div class="footer">
+        NCDMB Equipment Monitoring System
+    </div>
+
+</div>
+
+<script>
+
+const API = "http://127.0.0.1:5000";
+
+function login() {
+
+    const msg = document.getElementById("msg");
+    msg.innerHTML = "Checking...";
+
+    const data = {
+        username: document.getElementById("username").value,
+        password: document.getElementById("password").value
+    };
+
+    fetch(`${API}/login`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+    })
+    .then(async res => {
+        const result = await res.json();
+
+        if (!res.ok) {
+            throw new Error(result.message || "Login failed");
+        }
+
+        return result;
+    })
+    .then(data => {
+        msg.className = "msg success";
+        msg.innerText = data.message;
+
+        setTimeout(() => {
+            window.location.href = "dashboard.html";
+        }, 1000);
+    })
+    .catch(err => {
+        msg.className = "msg error";
+        msg.innerText = err.message;
+    });
+}
+
+</script>
+
+</body>
+</html>
