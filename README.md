@@ -1,4 +1,4 @@
-CopyNCDMB Equipment Monitoring System
+NCDMB Equipment Monitoring System
 
 Show Image
 Show Image
